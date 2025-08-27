@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Temp Tracker</title>
+</head>
+<body>
+<nav>
+    <a href="{{ url_for('index') }}">Home</a>
+    {% if session.get('admin_logged_in') %}
+    <a href="{{ url_for('admin_dashboard') }}">Admin</a>
+    <a href="{{ url_for('admin_logout') }}">Logout</a>
+    {% else %}
+    <a href="{{ url_for('admin_login') }}">Admin Login</a>
+    {% endif %}
+</nav>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul>
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+{% block content %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ location.name }} - Coolers</h1>
+<ul>
+  {% for c in coolers %}
+    <li><a href="{{ url_for('cooler_page', cooler_id=c.id) }}">{{ c.name }}</a></li>
+  {% else %}
+    <li>No coolers yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}
