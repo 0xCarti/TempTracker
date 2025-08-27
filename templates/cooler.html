@@ -5,41 +5,59 @@
 <img src="{{ cooler.image_url }}" alt="{{ cooler.name }}" style="max-width:100%;height:auto;">
 {% endif %}
 
+<p><em>Note: temperatures are recorded in °C and may be positive or negative.</em></p>
+
+{% if not start_log %}
 <h2>Start of Shift</h2>
 <p>Time: <span id="start-time"></span></p>
 <form id="start-form" method="post" action="{{ url_for('submit_log', cooler_id=cooler.id, shift='start') }}">
-  <label>Temperature: <input type="number" step="0.1" name="temperature" required></label><br>
+  <label>Temperature (°C): <input type="number" step="0.1" name="temperature" required></label>
+  <small>Negative values allowed.</small><br>
   <canvas id="start-pad" width="300" height="150"></canvas><br>
   <button type="button" onclick="startPad.clear()">Clear</button>
   <input type="hidden" name="signature" id="start-signature">
   <button type="submit">Submit Start Temp</button>
 </form>
+{% else %}
+<p>Start of shift temperature recorded: {{ start_log['temperature'] }}°C at {{ start_log['timestamp'] }}</p>
+{% endif %}
 
+{% if not end_log %}
 <h2>End of Shift</h2>
 <p>Time: <span id="end-time"></span></p>
 <form id="end-form" method="post" action="{{ url_for('submit_log', cooler_id=cooler.id, shift='end') }}">
-  <label>Temperature: <input type="number" step="0.1" name="temperature" required></label><br>
+  <label>Temperature (°C): <input type="number" step="0.1" name="temperature" required></label>
+  <small>Negative values allowed.</small><br>
   <canvas id="end-pad" width="300" height="150"></canvas><br>
   <button type="button" onclick="endPad.clear()">Clear</button>
   <input type="hidden" name="signature" id="end-signature">
   <button type="submit">Submit End Temp</button>
 </form>
+{% else %}
+<p>End of shift temperature recorded: {{ end_log['temperature'] }}°C at {{ end_log['timestamp'] }}</p>
+{% endif %}
 
 <p><a href="{{ url_for('cooler_qr', cooler_id=cooler.id) }}" target="_blank">Generate QR Code</a></p>
 
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
 <script>
-var startPad = new SignaturePad(document.getElementById('start-pad'));
-var endPad = new SignaturePad(document.getElementById('end-pad'));
-document.getElementById('start-time').textContent = new Date().toLocaleString();
-document.getElementById('end-time').textContent = new Date().toLocaleString();
-document.getElementById('start-form').addEventListener('submit', function(e){
-    if (startPad.isEmpty()) { alert('Please provide a signature.'); e.preventDefault(); return; }
-    document.getElementById('start-signature').value = startPad.toDataURL('image/png');
-});
-document.getElementById('end-form').addEventListener('submit', function(e){
-    if (endPad.isEmpty()) { alert('Please provide a signature.'); e.preventDefault(); return; }
-    document.getElementById('end-signature').value = endPad.toDataURL('image/png');
-});
+var startPadElem = document.getElementById('start-pad');
+if (startPadElem) {
+    var startPad = new SignaturePad(startPadElem);
+    document.getElementById('start-time').textContent = new Date().toLocaleString();
+    document.getElementById('start-form').addEventListener('submit', function(e){
+        if (startPad.isEmpty()) { alert('Please provide a signature.'); e.preventDefault(); return; }
+        document.getElementById('start-signature').value = startPad.toDataURL('image/png');
+    });
+}
+var endPadElem = document.getElementById('end-pad');
+if (endPadElem) {
+    var endPad = new SignaturePad(endPadElem);
+    document.getElementById('end-time').textContent = new Date().toLocaleString();
+    document.getElementById('end-form').addEventListener('submit', function(e){
+        if (endPad.isEmpty()) { alert('Please provide a signature.'); e.preventDefault(); return; }
+        document.getElementById('end-signature').value = endPad.toDataURL('image/png');
+    });
+}
 </script>
 {% endblock %}

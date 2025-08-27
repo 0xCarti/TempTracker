@@ -63,10 +63,17 @@ def location_page(location_id):
 def cooler_page(cooler_id):
     db = get_db()
     cooler = db.execute('SELECT * FROM cooler WHERE id=?', (cooler_id,)).fetchone()
+    today = datetime.utcnow().date().isoformat()
+    logs = db.execute(
+        'SELECT shift, temperature, timestamp FROM log WHERE cooler_id=? AND DATE(timestamp)=?',
+        (cooler_id, today)
+    ).fetchall()
+    start_log = next((log for log in logs if log['shift'] == 'start'), None)
+    end_log = next((log for log in logs if log['shift'] == 'end'), None)
     db.close()
     if cooler is None:
         return redirect(url_for('index'))
-    return render_template('cooler.html', cooler=cooler)
+    return render_template('cooler.html', cooler=cooler, start_log=start_log, end_log=end_log)
 
 
 @app.route('/cooler/<int:cooler_id>/submit/<shift>', methods=['POST'])
@@ -77,9 +84,14 @@ def submit_log(cooler_id, shift):
     if not temp or not signature:
         flash('Temperature and signature required.')
         return redirect(url_for('cooler_page', cooler_id=cooler_id))
+    try:
+        temp_val = float(temp)
+    except (TypeError, ValueError):
+        flash('Invalid temperature.')
+        return redirect(url_for('cooler_page', cooler_id=cooler_id))
     db = get_db()
     db.execute('INSERT INTO log (cooler_id, shift, temperature, timestamp, signature) VALUES (?, ?, ?, ?, ?)',
-               (cooler_id, shift, temp, timestamp, signature))
+               (cooler_id, shift, temp_val, timestamp, signature))
     db.commit()
     db.close()
     flash('Temperature saved.')
