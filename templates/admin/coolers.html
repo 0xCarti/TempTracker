@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Coolers</h1>
+<ul>
+  {% for c in coolers %}
+    <li>{{ c.name }} ({{ c.location_name }}) <a href="{{ url_for('delete_cooler', cooler_id=c.id) }}">Delete</a></li>
+  {% else %}
+    <li>No coolers.</li>
+  {% endfor %}
+</ul>
+<h2>Add Cooler</h2>
+<form method="post">
+  <input type="text" name="name" placeholder="Cooler name" required><br>
+  <label>Location:
+    <select name="location_id" required>
+      {% for loc in locations %}
+        <option value="{{ loc.id }}">{{ loc.name }}</option>
+      {% endfor %}
+    </select>
+  </label><br>
+  <input type="text" name="image_url" placeholder="Image URL"><br>
+  <button type="submit">Add</button>
+</form>
+{% endblock %}

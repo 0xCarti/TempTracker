@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS location (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cooler (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    image_url TEXT,
+    FOREIGN KEY(location_id) REFERENCES location(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cooler_id INTEGER NOT NULL,
+    shift TEXT NOT NULL,
+    temperature REAL NOT NULL,
+    timestamp TEXT NOT NULL,
+    signature TEXT NOT NULL,
+    FOREIGN KEY(cooler_id) REFERENCES cooler(id) ON DELETE CASCADE
+);
