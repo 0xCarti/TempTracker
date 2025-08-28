@@ -82,19 +82,19 @@ def submit_log(cooler_id, shift):
     signature = request.form.get('signature')
     timestamp = datetime.utcnow().isoformat()
     if not temp or not signature:
-        flash('Temperature and signature required.')
+        flash('Temperature and signature required.', 'warning')
         return redirect(url_for('cooler_page', cooler_id=cooler_id))
     try:
         temp_val = float(temp)
     except (TypeError, ValueError):
-        flash('Invalid temperature.')
+        flash('Invalid temperature.', 'error')
         return redirect(url_for('cooler_page', cooler_id=cooler_id))
     db = get_db()
     db.execute('INSERT INTO log (cooler_id, shift, temperature, timestamp, signature) VALUES (?, ?, ?, ?, ?)',
                (cooler_id, shift, temp_val, timestamp, signature))
     db.commit()
     db.close()
-    flash('Temperature saved.')
+    flash('Temperature saved.', 'success')
     return redirect(url_for('cooler_page', cooler_id=cooler_id))
 
 
