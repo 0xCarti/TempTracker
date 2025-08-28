@@ -8,14 +8,6 @@
     <title>Temp Tracker</title>
 </head>
 <body>
-<nav class="navbar">
-    <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">Home</a>
-    {% if session.get('admin_logged_in') %}
-    <a class="nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}" href="{{ url_for('admin_dashboard') }}">Admin</a>
-    <a class="nav-link" href="{{ url_for('admin_logout') }}">Logout</a>
-    {% else %}
-    <a class="nav-link {% if request.endpoint == 'admin_login' %}active{% endif %}" href="{{ url_for('admin_login') }}">Admin Login</a>
-    {% endif %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('index') }}">Temp Tracker</a>
@@ -28,31 +20,22 @@
             {% endif %}
         </div>
     </div>
-</nav>
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }}">
-        <span class="alert-icon">
-          {% if category == 'success' %}✔{% elif category == 'warning' %}⚠{% elif category == 'error' %}✖{% endif %}
-        </span>
-        {{ message }}
-      </div>
-    {% endfor %}
-<div class="container">
-{% with messages = get_flashed_messages() %}
-  {% if messages %}
-    <div class="alert alert-info">
-      <ul class="mb-0">
-      {% for message in messages %}
-        <li>{{ message }}</li>
+  </nav>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">
+          <span class="alert-icon">
+            {% if category == 'success' %}✔{% elif category == 'warning' %}⚠{% elif category == 'error' %}✖{% endif %}
+          </span>
+          {{ message }}
+        </div>
       {% endfor %}
-      </ul>
-    </div>
-  {% endif %}
-{% endwith %}
-{% block content %}{% endblock %}
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+    {% endif %}
+  {% endwith %}
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
