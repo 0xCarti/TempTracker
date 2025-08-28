@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Missed Temperatures Report</h1>
+<form method="post">
+  <div class="form-group">
+    <label>Start Date: <input class="input" type="date" name="start_date" required></label>
+  </div>
+  <div class="form-group">
+    <label>End Date: <input class="input" type="date" name="end_date" required></label>
+  </div>
+  <div class="form-group">
+    <label>Location:
+      <select class="input" name="location_id">
+        <option value="all">All Locations</option>
+        {% for loc in locations %}
+          <option value="{{ loc.id }}">{{ loc.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <div class="form-group">
+    <button class="btn" type="submit">Generate</button>
+  </div>
+</form>
+{% if total is not none %}
+<h2>Results</h2>
+<p>Total missed temps: {{ total }}</p>
+<table border="1" cellspacing="0" cellpadding="4">
+  <tr><th>Day</th><th>Missed Temps</th></tr>
+  {% for day, count in weekday_counts.items() %}
+    <tr><td>{{ day }}</td><td>{{ count }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}

@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS cooler (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     location_id INTEGER NOT NULL,
     name TEXT NOT NULL,
-    image_url TEXT,
+    image_path TEXT,
     FOREIGN KEY(location_id) REFERENCES location(id) ON DELETE CASCADE
 );
 
