@@ -57,10 +57,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
 <script>
+var tz = "{{ timezone }}";
+var opts = {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric', timeZone: tz};
 var startPadElem = document.getElementById('start-pad');
 if (startPadElem) {
     var startPad = new SignaturePad(startPadElem);
-    document.getElementById('start-time').textContent = new Date().toLocaleString();
+    document.getElementById('start-time').textContent = new Date().toLocaleString('en-GB', opts);
     document.getElementById('start-form').addEventListener('submit', function(e){
         if (startPad.isEmpty()) { alert('Please provide a signature.'); e.preventDefault(); return; }
         document.getElementById('start-signature').value = startPad.toDataURL('image/png');
@@ -69,7 +71,7 @@ if (startPadElem) {
 var endPadElem = document.getElementById('end-pad');
 if (endPadElem) {
     var endPad = new SignaturePad(endPadElem);
-    document.getElementById('end-time').textContent = new Date().toLocaleString();
+    document.getElementById('end-time').textContent = new Date().toLocaleString('en-GB', opts);
     document.getElementById('end-form').addEventListener('submit', function(e){
         if (endPad.isEmpty()) { alert('Please provide a signature.'); e.preventDefault(); return; }
         document.getElementById('end-signature').value = endPad.toDataURL('image/png');

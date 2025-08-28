@@ -3,6 +3,7 @@ import io
 import sqlite3
 from datetime import datetime
 from functools import wraps
+import pytz
 
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, send_file, flash)
@@ -17,6 +18,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev')
 def get_db():
     db = sqlite3.connect(app.config['DATABASE'])
     db.row_factory = sqlite3.Row
+    db.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
     return db
 
 
@@ -38,6 +40,19 @@ def admin_required(view):
             return redirect(url_for('admin_login'))
         return view(**kwargs)
     return wrapped_view
+
+
+def get_timezone():
+    db = get_db()
+    row = db.execute("SELECT value FROM settings WHERE key='timezone'").fetchone()
+    db.close()
+    return row['value'] if row else 'UTC'
+
+
+def format_timestamp(ts, tzname):
+    dt = datetime.fromisoformat(ts)
+    dt = pytz.utc.localize(dt).astimezone(pytz.timezone(tzname))
+    return dt.strftime('%H:%M %d/%m/%Y')
 
 
 @app.route('/')
@@ -71,9 +86,16 @@ def cooler_page(cooler_id):
     start_log = next((log for log in logs if log['shift'] == 'start'), None)
     end_log = next((log for log in logs if log['shift'] == 'end'), None)
     db.close()
+    tzname = get_timezone()
+    if start_log:
+        start_log = dict(start_log)
+        start_log['timestamp'] = format_timestamp(start_log['timestamp'], tzname)
+    if end_log:
+        end_log = dict(end_log)
+        end_log['timestamp'] = format_timestamp(end_log['timestamp'], tzname)
     if cooler is None:
         return redirect(url_for('index'))
-    return render_template('cooler.html', cooler=cooler, start_log=start_log, end_log=end_log)
+    return render_template('cooler.html', cooler=cooler, start_log=start_log, end_log=end_log, timezone=tzname)
 
 
 @app.route('/cooler/<int:cooler_id>/submit/<shift>', methods=['POST'])
@@ -195,7 +217,29 @@ def admin_logs():
                           JOIN location ON cooler.location_id = location.id
                           ORDER BY log.timestamp DESC''').fetchall()
     db.close()
-    return render_template('admin/logs.html', logs=logs)
+    tzname = get_timezone()
+    logs = [dict(log) for log in logs]
+    for log in logs:
+        log['timestamp'] = format_timestamp(log['timestamp'], tzname)
+    return render_template('admin/logs.html', logs=logs, timezone=tzname)
+
+
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@admin_required
+def admin_settings():
+    current_tz = get_timezone()
+    if request.method == 'POST':
+        tz = request.form.get('timezone')
+        if tz in pytz.all_timezones:
+            db = get_db()
+            db.execute("REPLACE INTO settings (key, value) VALUES ('timezone', ?)", (tz,))
+            db.commit()
+            db.close()
+            flash('Timezone updated.', 'success')
+            current_tz = tz
+        else:
+            flash('Invalid timezone.', 'error')
+    return render_template('admin/settings.html', timezone=current_tz, timezones=sorted(pytz.all_timezones))
 
 
 if __name__ == '__main__':
