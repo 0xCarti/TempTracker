@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Average Temperature Report</h1>
+<form method="post">
+  <div class="form-group">
+    <label>Start Date: <input class="input" type="date" name="start_date" required></label>
+  </div>
+  <div class="form-group">
+    <label>End Date: <input class="input" type="date" name="end_date" required></label>
+  </div>
+  <div class="form-group">
+    <label>Location:
+      <select class="input" name="location_id">
+        <option value="all">All Locations</option>
+        {% for loc in locations %}
+          <option value="{{ loc.id }}">{{ loc.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <div class="form-group">
+    <button class="btn" type="submit">Generate</button>
+  </div>
+</form>
+{% if results %}
+<h2>Results</h2>
+<p>Average Start Time: {{ results.start_time }}</p>
+<p>Average Start Temperature: {{ results.start_temp }}°C</p>
+<p>Average End Time: {{ results.end_time }}</p>
+<p>Average End Temperature: {{ results.end_temp }}°C</p>
+{% endif %}
+{% endblock %}

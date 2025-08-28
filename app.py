@@ -1,18 +1,21 @@
 import os
 import io
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 import pytz
 
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, send_file, flash)
+from werkzeug.utils import secure_filename
 import qrcode
 
 app = Flask(__name__)
 app.config['DATABASE'] = os.path.join(app.root_path, 'app.db')
 app.config['ADMIN_PASSWORD'] = os.environ.get('ADMIN_PASSWORD', 'admin')
 app.secret_key = os.environ.get('SECRET_KEY', 'dev')
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 
 def get_db():
@@ -187,10 +190,15 @@ def admin_coolers():
     if request.method == 'POST':
         name = request.form.get('name')
         location_id = request.form.get('location_id')
-        image_url = request.form.get('image_url')
+        image = request.files.get('image')
+        image_path = None
+        if image and image.filename:
+            filename = secure_filename(image.filename)
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            image_path = os.path.join('uploads', filename)
         if name and location_id:
-            db.execute('INSERT INTO cooler (location_id, name, image_url) VALUES (?, ?, ?)',
-                       (location_id, name, image_url))
+            db.execute('INSERT INTO cooler (location_id, name, image_path) VALUES (?, ?, ?)',
+                       (location_id, name, image_path))
             db.commit()
     coolers = db.execute('SELECT cooler.*, location.name as location_name FROM cooler JOIN location ON cooler.location_id = location.id').fetchall()
     db.close()
@@ -223,6 +231,102 @@ def admin_logs():
         log['timestamp'] = format_timestamp(log['timestamp'], tzname)
     return render_template('admin/logs.html', logs=logs, timezone=tzname)
 
+
+@app.route('/admin/reports/averages', methods=['GET', 'POST'])
+@admin_required
+def report_average():
+    db = get_db()
+    locations = db.execute('SELECT * FROM location').fetchall()
+    results = None
+    if request.method == 'POST':
+        start_date = request.form.get('start_date')
+        end_date = request.form.get('end_date')
+        location_id = request.form.get('location_id')
+        query = ('SELECT log.shift, log.temperature, log.timestamp '
+                 'FROM log JOIN cooler ON log.cooler_id = cooler.id '
+                 'WHERE DATE(log.timestamp) BETWEEN ? AND ?')
+        params = [start_date, end_date]
+        if location_id != 'all':
+            query += ' AND cooler.location_id = ?'
+            params.append(location_id)
+        logs = db.execute(query, params).fetchall()
+        tz = pytz.timezone(get_timezone())
+        start_times, start_temps, end_times, end_temps = [], [], [], []
+        for log in logs:
+            dt = datetime.fromisoformat(log['timestamp'])
+            dt_local = pytz.utc.localize(dt).astimezone(tz)
+            seconds = dt_local.hour * 3600 + dt_local.minute * 60 + dt_local.second
+            if log['shift'] == 'start':
+                start_temps.append(log['temperature'])
+                start_times.append(seconds)
+            elif log['shift'] == 'end':
+                end_temps.append(log['temperature'])
+                end_times.append(seconds)
+
+        def avg_time(values):
+            if not values:
+                return 'N/A'
+            avg_sec = sum(values) / len(values)
+            h = int(avg_sec // 3600)
+            m = int((avg_sec % 3600) // 60)
+            return f"{h:02d}:{m:02d}"
+
+        def avg_temp(values):
+            if not values:
+                return 'N/A'
+            return round(sum(values) / len(values), 2)
+
+        results = {
+            'start_time': avg_time(start_times),
+            'start_temp': avg_temp(start_temps),
+            'end_time': avg_time(end_times),
+            'end_temp': avg_temp(end_temps),
+        }
+    db.close()
+    return render_template('admin/report_avg.html', locations=locations, results=results)
+
+
+@app.route('/admin/reports/missed', methods=['GET', 'POST'])
+@admin_required
+def report_missed():
+    db = get_db()
+    locations = db.execute('SELECT * FROM location').fetchall()
+    total = None
+    weekday_counts = None
+    if request.method == 'POST':
+        start_date = request.form.get('start_date')
+        end_date = request.form.get('end_date')
+        location_id = request.form.get('location_id')
+        start_dt = datetime.fromisoformat(start_date).date()
+        end_dt = datetime.fromisoformat(end_date).date()
+        if location_id != 'all':
+            cooler_rows = db.execute('SELECT id FROM cooler WHERE location_id=?', (location_id,)).fetchall()
+            logs = db.execute('''SELECT log.cooler_id, log.shift, DATE(log.timestamp) as d
+                                 FROM log JOIN cooler ON log.cooler_id=cooler.id
+                                 WHERE DATE(log.timestamp) BETWEEN ? AND ? AND cooler.location_id=?''',
+                              (start_date, end_date, location_id)).fetchall()
+        else:
+            cooler_rows = db.execute('SELECT id FROM cooler').fetchall()
+            logs = db.execute('''SELECT log.cooler_id, log.shift, DATE(log.timestamp) as d
+                                 FROM log JOIN cooler ON log.cooler_id=cooler.id
+                                 WHERE DATE(log.timestamp) BETWEEN ? AND ?''',
+                              (start_date, end_date)).fetchall()
+        cooler_ids = [row['id'] for row in cooler_rows]
+        existing = {(row['cooler_id'], row['d'], row['shift']) for row in logs}
+        total = 0
+        weekday_counts = {day: 0 for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']}
+        current = start_dt
+        while current <= end_dt:
+            day_name = current.strftime('%A')
+            d_str = current.isoformat()
+            for cid in cooler_ids:
+                for shift in ('start', 'end'):
+                    if (cid, d_str, shift) not in existing:
+                        total += 1
+                        weekday_counts[day_name] += 1
+            current += timedelta(days=1)
+    db.close()
+    return render_template('admin/report_missed.html', locations=locations, total=total, weekday_counts=weekday_counts)
 
 @app.route('/admin/settings', methods=['GET', 'POST'])
 @admin_required

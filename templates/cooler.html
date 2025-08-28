@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1>{{ cooler.name }}</h1>
-{% if cooler.image_url %}
-<img src="{{ cooler.image_url }}" alt="{{ cooler.name }}" style="max-width:100%;height:auto;">
+{% if cooler.image_path %}
+<img src="{{ url_for('static', filename=cooler.image_path) }}" alt="{{ cooler.name }}" style="max-width:100%;height:auto;">
 {% endif %}
 
 <p><em>Note: temperatures are recorded in °C and may be positive or negative.</em></p>
