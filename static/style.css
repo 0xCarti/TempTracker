@@ -1,3 +1,39 @@
+
+body { font-family: Arial, sans-serif; margin: 20px; }
+
+.navbar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.nav-link {
+    text-decoration: none;
+    padding: 5px 10px;
+}
+
+.nav-link:hover {
+    background-color: #f0f0f0;
+}
+
+.nav-link.active {
+    font-weight: bold;
+    border-bottom: 2px solid #000;
+}
+
+@media (max-width: 600px) {
+    .navbar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .nav-link {
+        width: 100%;
+    }
+}
+
+canvas { border: 1px solid #000; }
+form { margin-bottom: 20px; }
+
 :root {
   --color-primary: #0d6efd;
   --color-secondary: #6c757d;
