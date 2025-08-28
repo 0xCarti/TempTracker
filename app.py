@@ -9,6 +9,7 @@ from flask import (Flask, render_template, request, redirect, url_for,
                    session, send_file, flash)
 from werkzeug.utils import secure_filename
 import qrcode
+import uuid
 
 # Load environment variables from a .env file if present
 try:
@@ -236,8 +237,9 @@ def admin_coolers():
         image_path = None
         if image and image.filename:
             filename = secure_filename(image.filename)
-            image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            image_path = os.path.join('uploads', filename)
+            unique_name = f"{uuid.uuid4().hex}{os.path.splitext(filename)[1]}"
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
+            image_path = os.path.join('uploads', unique_name)
         if name and location_id:
             db.execute('INSERT INTO cooler (location_id, name, image_path) VALUES (?, ?, ?)',
                        (location_id, name, image_path))
