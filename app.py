@@ -10,8 +10,22 @@ from flask import (Flask, render_template, request, redirect, url_for,
 from werkzeug.utils import secure_filename
 import qrcode
 
+# Load environment variables from a .env file if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+except Exception:
+    pass
+
 app = Flask(__name__)
-app.config['DATABASE'] = os.path.join(app.root_path, 'app.db')
+# Determine database path from env, fallback to app root
+db_path = os.environ.get('DATABASE_PATH') or os.path.join(app.root_path, 'app.db')
+# If the provided path is a directory (e.g., due to a bind mount), place the DB inside it
+if os.path.isdir(db_path):
+    db_path = os.path.join(db_path, 'app.db')
+# Ensure parent directory exists
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
+app.config['DATABASE'] = db_path
 app.config['ADMIN_PASSWORD'] = os.environ.get('ADMIN_PASSWORD', 'admin')
 app.secret_key = os.environ.get('SECRET_KEY', 'dev')
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
@@ -22,6 +36,15 @@ def get_db():
     db = sqlite3.connect(app.config['DATABASE'])
     db.row_factory = sqlite3.Row
     db.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+    # Lightweight migration: ensure 'note' column exists on 'log'
+    try:
+        cols = db.execute("PRAGMA table_info(log)").fetchall()
+        col_names = {c[1] for c in cols}
+        if 'note' not in col_names:
+            db.execute('ALTER TABLE log ADD COLUMN note TEXT')
+            db.commit()
+    except Exception:
+        pass
     return db
 
 
@@ -83,7 +106,7 @@ def cooler_page(cooler_id):
     cooler = db.execute('SELECT * FROM cooler WHERE id=?', (cooler_id,)).fetchone()
     today = datetime.utcnow().date().isoformat()
     logs = db.execute(
-        'SELECT shift, temperature, timestamp FROM log WHERE cooler_id=? AND DATE(timestamp)=?',
+        'SELECT shift, temperature, timestamp, note FROM log WHERE cooler_id=? AND DATE(timestamp)=?',
         (cooler_id, today)
     ).fetchall()
     start_log = next((log for log in logs if log['shift'] == 'start'), None)
@@ -101,22 +124,41 @@ def cooler_page(cooler_id):
     return render_template('cooler.html', cooler=cooler, start_log=start_log, end_log=end_log, timezone=tzname)
 
 
-@app.route('/cooler/<int:cooler_id>/submit/<shift>', methods=['POST'])
+@app.route('/cooler/<int:cooler_id>/submit/<shift>', methods=['GET', 'POST'])
 def submit_log(cooler_id, shift):
+    if request.method == 'GET':
+        if shift not in ('start', 'end'):
+            return redirect(url_for('cooler_page', cooler_id=cooler_id))
+        db = get_db()
+        cooler = db.execute('SELECT * FROM cooler WHERE id=?', (cooler_id,)).fetchone()
+        today = datetime.utcnow().date().isoformat()
+        exists = db.execute(
+            'SELECT 1 FROM log WHERE cooler_id=? AND shift=? AND DATE(timestamp)=?',
+            (cooler_id, shift, today)
+        ).fetchone()
+        db.close()
+        if exists:
+            flash(f'Temperature for {shift} already submitted today.', 'warning')
+            return redirect(url_for('cooler_page', cooler_id=cooler_id))
+        tzname = get_timezone()
+        return render_template('submit.html', cooler=cooler, shift=shift, timezone=tzname)
+
+    # POST: save log
     temp = request.form.get('temperature')
     signature = request.form.get('signature')
+    note = request.form.get('note')
     timestamp = datetime.utcnow().isoformat()
     if not temp or not signature:
         flash('Temperature and signature required.', 'warning')
-        return redirect(url_for('cooler_page', cooler_id=cooler_id))
+        return redirect(url_for('submit_log', cooler_id=cooler_id, shift=shift))
     try:
         temp_val = float(temp)
     except (TypeError, ValueError):
         flash('Invalid temperature.', 'error')
-        return redirect(url_for('cooler_page', cooler_id=cooler_id))
+        return redirect(url_for('submit_log', cooler_id=cooler_id, shift=shift))
     db = get_db()
-    db.execute('INSERT INTO log (cooler_id, shift, temperature, timestamp, signature) VALUES (?, ?, ?, ?, ?)',
-               (cooler_id, shift, temp_val, timestamp, signature))
+    db.execute('INSERT INTO log (cooler_id, shift, temperature, timestamp, signature, note) VALUES (?, ?, ?, ?, ?, ?)',
+               (cooler_id, shift, temp_val, timestamp, signature, note))
     db.commit()
     db.close()
     flash('Temperature saved.', 'success')
@@ -296,6 +338,7 @@ def report_missed():
     total_days = None
     missed_days = None
     percent_missed = None
+    expected_total = None
     if request.method == 'POST':
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
@@ -335,17 +378,20 @@ def report_missed():
                 missed_days_set.add(d_str)
             current += timedelta(days=1)
         missed_days = len(missed_days_set)
-        percent_missed = (missed_days / total_days * 100) if total_days > 0 else 0
+        # Expected total temperature logs for the period = days * coolers * 2 shifts per day
+        expected_total = total_days * len(cooler_ids) * 2
+        percent_missed = (total / expected_total * 100) if expected_total > 0 else 0
     db.close()
     return render_template(
-        'admin/report_missed.html',
-        locations=locations,
-        total=total,
-        weekday_counts=weekday_counts,
-        total_days=total_days,
-        missed_days=missed_days,
-        percent_missed=percent_missed,
-    )
+            'admin/report_missed.html',
+            locations=locations,
+            total=total,
+            weekday_counts=weekday_counts,
+            total_days=total_days,
+            missed_days=missed_days,
+            percent_missed=percent_missed,
+            expected_total=expected_total,
+        )
 
 @app.route('/admin/settings', methods=['GET', 'POST'])
 @admin_required
@@ -366,4 +412,5 @@ def admin_settings():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('FLASK_PORT') or os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)

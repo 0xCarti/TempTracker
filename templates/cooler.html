@@ -1,81 +1,29 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1>{{ cooler.name }}</h1>
+<div class="d-none d-sm-flex justify-content-between align-items-center mb-2">
+  <a class="btn btn-primary" href="{{ url_for('location_page', location_id=cooler.location_id) }}" role="button">← Back</a>
+  <h1 class="m-0">{{ cooler.name }}</h1>
+  <span></span>
+</div>
 {% if cooler.image_path %}
-<img src="{{ url_for('static', filename=cooler.image_path) }}" alt="{{ cooler.name }}" style="max-width:100%;height:auto;">
+<img src="{{ url_for('static', filename=cooler.image_path) }}" alt="{{ cooler.name }}" style="max-width:100%;height:auto;border-radius:8px;">
 {% endif %}
 
-<p><em>Note: temperatures are recorded in °C and may be positive or negative.</em></p>
+<p class="text-muted"><em>Choose a shift to record temperature.</em></p>
 
-{% if not start_log %}
-<h2>Start of Shift</h2>
-<p>Time: <span id="start-time"></span></p>
-<form id="start-form" method="post" action="{{ url_for('submit_log', cooler_id=cooler.id, shift='start') }}">
-  <div class="form-group">
-    <label>Temperature (°C): <input class="input" type="number" step="0.1" name="temperature" required></label>
-    <small>Negative values allowed.</small>
-  </div>
-  <div class="form-group">
-    <canvas id="start-pad" width="300" height="150"></canvas>
-  </div>
-  <div class="form-group">
-    <button class="btn" type="button" onclick="startPad.clear()">Clear</button>
-  </div>
-  <input type="hidden" name="signature" id="start-signature">
-  <div class="form-group">
-    <button class="btn" type="submit">Submit Start Temp</button>
-  </div>
-</form>
-{% else %}
-<p>Start of shift temperature recorded: {{ start_log['temperature'] }}°C at {{ start_log['timestamp'] }}</p>
-{% endif %}
+<div class="d-grid gap-3">
+  {% if not start_log %}
+    <a class="btn btn-primary" href="{{ url_for('submit_log', cooler_id=cooler.id, shift='start') }}">Record Start Temp</a>
+  {% else %}
+    <div class="alert alert-success">Start recorded: {{ start_log['temperature'] }}°C at {{ start_log['timestamp'] }}{% if start_log.get('note') %} — {{ start_log['note'] }}{% endif %}</div>
+  {% endif %}
 
-{% if not end_log %}
-<h2>End of Shift</h2>
-<p>Time: <span id="end-time"></span></p>
-<form id="end-form" method="post" action="{{ url_for('submit_log', cooler_id=cooler.id, shift='end') }}">
-  <div class="form-group">
-    <label>Temperature (°C): <input class="input" type="number" step="0.1" name="temperature" required></label>
-    <small>Negative values allowed.</small>
-  </div>
-  <div class="form-group">
-    <canvas id="end-pad" width="300" height="150"></canvas>
-  </div>
-  <div class="form-group">
-    <button class="btn" type="button" onclick="endPad.clear()">Clear</button>
-  </div>
-  <input type="hidden" name="signature" id="end-signature">
-  <div class="form-group">
-    <button class="btn" type="submit">Submit End Temp</button>
-  </div>
-</form>
-{% else %}
-<p>End of shift temperature recorded: {{ end_log['temperature'] }}°C at {{ end_log['timestamp'] }}</p>
-{% endif %}
+  {% if not end_log %}
+    <a class="btn btn-primary" href="{{ url_for('submit_log', cooler_id=cooler.id, shift='end') }}">Record End Temp</a>
+  {% else %}
+    <div class="alert alert-success">End recorded: {{ end_log['temperature'] }}°C at {{ end_log['timestamp'] }}{% if end_log.get('note') %} — {{ end_log['note'] }}{% endif %}</div>
+  {% endif %}
+</div>
 
-<p><a href="{{ url_for('cooler_qr', cooler_id=cooler.id) }}" target="_blank">Generate QR Code</a></p>
-
-<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
-<script>
-var tz = "{{ timezone }}";
-var opts = {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric', timeZone: tz};
-var startPadElem = document.getElementById('start-pad');
-if (startPadElem) {
-    var startPad = new SignaturePad(startPadElem);
-    document.getElementById('start-time').textContent = new Date().toLocaleString('en-GB', opts);
-    document.getElementById('start-form').addEventListener('submit', function(e){
-        if (startPad.isEmpty()) { alert('Please provide a signature.'); e.preventDefault(); return; }
-        document.getElementById('start-signature').value = startPad.toDataURL('image/png');
-    });
-}
-var endPadElem = document.getElementById('end-pad');
-if (endPadElem) {
-    var endPad = new SignaturePad(endPadElem);
-    document.getElementById('end-time').textContent = new Date().toLocaleString('en-GB', opts);
-    document.getElementById('end-form').addEventListener('submit', function(e){
-        if (endPad.isEmpty()) { alert('Please provide a signature.'); e.preventDefault(); return; }
-        document.getElementById('end-signature').value = endPad.toDataURL('image/png');
-    });
-}
-</script>
+<p class="mt-3"><a href="{{ url_for('cooler_qr', cooler_id=cooler.id) }}" target="_blank">Generate QR Code</a></p>
 {% endblock %}

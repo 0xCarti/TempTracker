@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS log (
     temperature REAL NOT NULL,
     timestamp TEXT NOT NULL,
     signature TEXT NOT NULL,
+    note TEXT,
     FOREIGN KEY(cooler_id) REFERENCES cooler(id) ON DELETE CASCADE
 );
 

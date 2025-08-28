@@ -63,6 +63,7 @@ form { margin-bottom: 20px; }
   background-color: #f8d7da;
   color: #721c24;
   border: 1px solid #f5c6cb;
+}
 
 .form-group {
   margin-bottom: 1rem;
@@ -100,6 +101,7 @@ form { margin-bottom: 20px; }
 .btn:focus {
   background-color: #0056b3;
   outline: none;
+}
 
 :root {
   --color-primary: #0d6efd;
@@ -118,4 +120,26 @@ form { margin-bottom: 20px; }
 body {
   background-color: var(--color-bg);
   color: var(--color-text);
+}
+
+/* Mobile header swap: hide desktop navbar, show mobile header */
+@media (max-width: 576px) {
+  nav.navbar { display: none !important; }
+  .mobile-header {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+    background: var(--bs-body-bg, #fff);
+    border-bottom: 1px solid #e9ecef;
+    padding: 8px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .mobile-header .btn { width: 100%; }
+}
+@media (min-width: 577px) {
+  .mobile-header { display: none !important; }
 }

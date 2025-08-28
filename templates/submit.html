@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+{% block mobile_header %}{% endblock %}
+{% block content %}
+<div class="submit-header mb-1">
+  <a class="btn btn-primary" href="{{ url_for('cooler_page', cooler_id=cooler.id) }}" role="button">← Back</a>
+  <div class="fw-bold">{{ cooler.name }} — {{ 'Start' if shift=='start' else 'End' }}</div>
+  <button form="submit-form" type="submit" class="btn btn-primary">Submit</button>
+  </div>
+
+<form id="submit-form" method="post" action="{{ url_for('submit_log', cooler_id=cooler.id, shift=shift) }}">
+  <input type="hidden" name="temperature" id="temperature" value="0">
+  <input type="hidden" name="signature" id="signature">
+
+  <div class="dial-wrap mb-3">
+    <canvas id="dialCanvas"></canvas>
+    <div class="dial-center"><span id="displayTemp">0.0</span> <span id="displayUnit">°C</span></div>
+  </div>
+
+  <div class="unit-switch">
+    <label class="form-check-label">Units:</label>
+    <div class="btn-group" role="group" aria-label="Units">
+      <input type="radio" class="btn-check" name="unit" id="unitC" autocomplete="off" checked>
+      <label class="btn btn-outline-primary" for="unitC">°C</label>
+      <input type="radio" class="btn-check" name="unit" id="unitF" autocomplete="off">
+      <label class="btn btn-outline-primary" for="unitF">°F</label>
+    </div>
+  </div>
+
+  <div class="form-group mt-3">
+    <label>Comment (optional)</label>
+    <textarea class="form-control" name="note" rows="2" placeholder="Add context, issues, or observations..."></textarea>
+  </div>
+
+  <div class="form-group mt-3">
+    <label>Signature</label>
+    <canvas id="sigPad" width="340" height="160" style="border:1px solid #ccc; border-radius:6px; width:100%; max-width:340px; height:160px;"></canvas>
+    <div class="mt-2">
+      <button class="btn btn-secondary" type="button" id="sigClear">Clear</button>
+    </div>
+  </div>
+</form>
+
+<style>
+.submit-header { position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; padding: 6px 0; background: var(--bs-body-bg, #fff); }
+.dial-wrap { position: relative; height: auto; min-height: 320px; display: grid; place-items: center; overscroll-behavior: contain; touch-action: none; }
+#dialCanvas { width: clamp(260px, 90vw, 340px); height: clamp(260px, 90vw, 340px); touch-action: none; }
+.dial-center { position: absolute; text-align: center; font-size: 2rem; font-weight: 700; user-select: none; pointer-events: auto; }
+.unit-switch { display: flex; justify-content: center; gap: 12px; align-items: center; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+<script>
+(function(){
+  const canvas = document.getElementById('dialCanvas');
+  const displayTemp = document.getElementById('displayTemp');
+  const displayUnit = document.getElementById('displayUnit');
+  const tempInput = document.getElementById('temperature');
+  const unitC = document.getElementById('unitC');
+  const unitF = document.getElementById('unitF');
+
+  // Ranges
+  const minC = -50, maxC = 50; // store in °C (wide range)
+  const minF = Math.round((minC * 9/5 + 32));
+  const maxF = Math.round((maxC * 9/5 + 32));
+  let unit = 'C';
+  let tempC = 0.0; // stored base value
+
+  function cToF(c){ return c * 9/5 + 32; }
+  function fToC(f){ return (f - 32) * 5/9; }
+
+  // Canvas sizing
+  function resizeCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const size = Math.min(rect.width, rect.height);
+    canvas.width = Math.floor(size * dpr);
+    canvas.height = Math.floor(size * dpr);
+    drawDial();
+  }
+
+  // Angle/value mapping (0..2π maps to min..max)
+  const TAU = Math.PI * 2;
+  const startAng = -Math.PI/2; // top
+  const range = (maxC - minC);
+  function angleToC(canvasAngle){
+    // Relative angle from top; normalize to [-PI, PI]
+    let theta = canvasAngle - startAng;
+    while (theta <= -Math.PI) theta += TAU;
+    while (theta > Math.PI) theta -= TAU;
+    // Map -PI..PI to -range/2 .. range/2 centered at 0°C
+    return (theta / TAU) * range;
+  }
+  function cToAngle(c){
+    // Map temperature (°C) in [-range/2, range/2] to angle from top
+    let theta = (c / range) * TAU; // [-PI..PI]
+    return startAng + theta;
+  }
+
+  function clampC(c){ return Math.max(minC, Math.min(maxC, c)); }
+  function quantize05(c){ return Math.round(c / 0.5) * 0.5; }
+
+  function updateDisplay(){
+    tempC = quantize05(clampC(tempC));
+    const shown = unit === 'C' ? tempC : cToF(tempC);
+    displayTemp.textContent = shown.toFixed(1);
+    displayUnit.textContent = unit === 'C' ? '°C' : '°F';
+    tempInput.value = tempC.toFixed(1); // submit in °C
+    drawDial();
+  }
+
+  function drawDial(){
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width, h = canvas.height;
+    const cx = w/2, cy = h/2; const r = Math.min(w,h)/2 - 12*dpr;
+    ctx.clearRect(0,0,w,h);
+
+    // outer circle
+    ctx.lineWidth = 8*dpr; ctx.strokeStyle = '#e9ecef';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+
+    // progress arc
+    const theta = (tempC / range) * TAU; // [-PI..PI]
+    const ang = startAng + theta;
+    ctx.strokeStyle = '#0d6efd';
+    // Draw arc from 0°C (top) to selected temp; CW for positive, CCW for negative
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, startAng, ang, theta < 0);
+    ctx.stroke();
+
+    // tick marks every 10°C
+    ctx.save(); ctx.translate(cx, cy);
+    for (let c = minC; c <= maxC + 0.001; c += 10){
+      const a = cToAngle(c);
+      ctx.save(); ctx.rotate(a);
+      ctx.fillStyle = '#adb5bd';
+      ctx.fillRect(r-16*dpr, -2*dpr, 12*dpr, 4*dpr);
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // knob indicator
+    const ix = cx + Math.cos(ang) * (r-6*dpr);
+    const iy = cy + Math.sin(ang) * (r-6*dpr);
+    ctx.fillStyle = '#0d6efd';
+    ctx.beginPath(); ctx.arc(ix, iy, 10*dpr, 0, Math.PI*2); ctx.fill();
+  }
+
+  function setFromPointer(ev){
+    const rect = canvas.getBoundingClientRect();
+    const x = (ev.clientX ?? ev.touches[0].clientX) - rect.left;
+    const y = (ev.clientY ?? ev.touches[0].clientY) - rect.top;
+    const cx = rect.width/2, cy = rect.height/2;
+    const dx = x - cx, dy = y - cy;
+    let angle = Math.atan2(dy, dx); // -PI..PI, 0 at right
+    if (angle < 0) angle += Math.PI*2;
+    tempC = quantize05(angleToC(angle));
+    updateDisplay();
+  }
+
+  let dragging = false;
+  function preventTouchScroll(e){ e.preventDefault(); }
+  function lockBodyScroll(){ document.body.addEventListener('touchmove', preventTouchScroll, {passive:false}); }
+  function unlockBodyScroll(){ document.body.removeEventListener('touchmove', preventTouchScroll); }
+
+  canvas.addEventListener('pointerdown', (e)=>{ dragging = true; e.preventDefault(); lockBodyScroll(); setFromPointer(e); canvas.setPointerCapture?.(e.pointerId); });
+  canvas.addEventListener('pointermove', (e)=>{ if (dragging) { e.preventDefault(); setFromPointer(e); } });
+  canvas.addEventListener('pointerup', ()=> { dragging = false; unlockBodyScroll(); });
+  canvas.addEventListener('pointercancel', ()=> { dragging = false; unlockBodyScroll(); });
+
+  // Fallback for older iOS where pointer events may be partial
+  if (!window.PointerEvent) {
+    canvas.addEventListener('touchstart', (e)=>{ dragging = true; lockBodyScroll(); setFromPointer(e.touches[0]); e.preventDefault(); }, {passive:false});
+    canvas.addEventListener('touchmove', (e)=>{ if (dragging) { setFromPointer(e.touches[0]); e.preventDefault(); } }, {passive:false});
+    canvas.addEventListener('touchend', ()=>{ dragging = false; unlockBodyScroll(); }, {passive:false});
+    canvas.addEventListener('touchcancel', ()=>{ dragging = false; unlockBodyScroll(); }, {passive:false});
+  }
+
+  unitC.addEventListener('change', ()=>{ if (unitC.checked){ unit='C'; updateDisplay(); } });
+  unitF.addEventListener('change', ()=>{ if (unitF.checked){ unit='F'; updateDisplay(); } });
+
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('orientationchange', resizeCanvas);
+  resizeCanvas();
+  updateDisplay();
+
+  // Manual entry by tapping center
+  const dialCenter = document.querySelector('.dial-center');
+  dialCenter.style.pointerEvents = 'auto';
+  dialCenter.addEventListener('click', function(){
+    const currentShown = unit === 'C' ? tempC : cToF(tempC);
+    const entered = prompt(`Enter temperature in °${unit} (${unit==='C' ? minC : minF} to ${unit==='C' ? maxC : maxF})`, currentShown.toFixed(1));
+    if (entered === null) return;
+    let v = parseFloat(String(entered).replace(',', '.'));
+    if (Number.isNaN(v)) return;
+    if (unit === 'F') v = fToC(v);
+    tempC = quantize05(clampC(v));
+    updateDisplay();
+  });
+
+  // Signature pad
+  const sigPadElem = document.getElementById('sigPad');
+  const signatureInput = document.getElementById('signature');
+  const sigPad = new SignaturePad(sigPadElem);
+  document.getElementById('sigClear').addEventListener('click', function(){ sigPad.clear(); });
+
+  document.getElementById('submit-form').addEventListener('submit', function(e){
+    if (sigPad.isEmpty()) { alert('Please provide a signature.'); e.preventDefault(); return; }
+    signatureInput.value = sigPad.toDataURL('image/png');
+  });
+})();
+</script>
+{% endblock %}
