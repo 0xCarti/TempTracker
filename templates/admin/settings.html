@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Settings</h1>
+<form method="post">
+  <div class="mb-3">
+    <label for="timezone" class="form-label">Timezone</label>
+    <select class="form-select" id="timezone" name="timezone">
+      {% for tz in timezones %}
+      <option value="{{ tz }}" {% if tz == timezone %}selected{% endif %}>{{ tz }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="btn btn-primary" type="submit">Save</button>
+</form>
+{% endblock %}
+

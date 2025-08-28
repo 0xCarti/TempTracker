@@ -20,3 +20,8 @@ CREATE TABLE IF NOT EXISTS log (
     signature TEXT NOT NULL,
     FOREIGN KEY(cooler_id) REFERENCES cooler(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);

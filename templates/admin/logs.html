@@ -2,7 +2,7 @@
 {% block content %}
 <h1>Temperature Logs</h1>
 <table border="1" cellspacing="0" cellpadding="4">
-<tr><th>Location</th><th>Cooler</th><th>Shift</th><th>Temperature</th><th>Time</th><th>Signature</th></tr>
+<tr><th>Location</th><th>Cooler</th><th>Shift</th><th>Temperature</th><th>Time ({{ timezone }})</th><th>Signature</th></tr>
 {% for log in logs %}
 <tr>
   <td>{{ log.location_name }}</td>
