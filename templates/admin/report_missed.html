@@ -24,6 +24,8 @@
 </form>
 {% if total is not none %}
 <h2>Results</h2>
+<p>Total days in range: {{ total_days }}</p>
+<p>Days with missed temps: {{ missed_days }} ({{ percent_missed|round(2) }}%)</p>
 <p>Total missed temps: {{ total }}</p>
 <table border="1" cellspacing="0" cellpadding="4">
   <tr><th>Day</th><th>Missed Temps</th></tr>

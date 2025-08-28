@@ -293,6 +293,9 @@ def report_missed():
     locations = db.execute('SELECT * FROM location').fetchall()
     total = None
     weekday_counts = None
+    total_days = None
+    missed_days = None
+    percent_missed = None
     if request.method == 'POST':
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
@@ -315,18 +318,34 @@ def report_missed():
         existing = {(row['cooler_id'], row['d'], row['shift']) for row in logs}
         total = 0
         weekday_counts = {day: 0 for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']}
+        total_days = (end_dt - start_dt).days + 1
+        missed_days_set = set()
         current = start_dt
         while current <= end_dt:
             day_name = current.strftime('%A')
             d_str = current.isoformat()
+            day_missed = False
             for cid in cooler_ids:
                 for shift in ('start', 'end'):
                     if (cid, d_str, shift) not in existing:
                         total += 1
                         weekday_counts[day_name] += 1
+                        day_missed = True
+            if day_missed:
+                missed_days_set.add(d_str)
             current += timedelta(days=1)
+        missed_days = len(missed_days_set)
+        percent_missed = (missed_days / total_days * 100) if total_days > 0 else 0
     db.close()
-    return render_template('admin/report_missed.html', locations=locations, total=total, weekday_counts=weekday_counts)
+    return render_template(
+        'admin/report_missed.html',
+        locations=locations,
+        total=total,
+        weekday_counts=weekday_counts,
+        total_days=total_days,
+        missed_days=missed_days,
+        percent_missed=percent_missed,
+    )
 
 @app.route('/admin/settings', methods=['GET', 'POST'])
 @admin_required
