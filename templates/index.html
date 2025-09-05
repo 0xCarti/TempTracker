@@ -2,7 +2,7 @@
 {% block mobile_header %}{% endblock %}
 {% block content %}
 <style>
-@media (max-width: 576px) {
+@media (max-width: 1024px) {
   nav.navbar { display: flex !important; }
   .mobile-header { display: none !important; }
   .loc-list { list-style: none; padding: 0; margin: 0; }
@@ -12,6 +12,14 @@
 }
 </style>
 <h1>Locations</h1>
+<form method="get" class="mb-3">
+  <select name="tag" class="input" onchange="this.form.submit()">
+    <option value="">All Tags</option>
+    {% for t in tags %}
+      <option value="{{ t }}" {% if current_tag==t %}selected{% endif %}>{{ t }}</option>
+    {% endfor %}
+  </select>
+</form>
 <ul class="loc-list">
   {% for loc in locations %}
     <li><a class="loc-link" href="{{ url_for('location_page', location_id=loc.id) }}">{{ loc.name }}</a></li>

@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Edit Location</h1>
+<form method="post" enctype="multipart/form-data">
+  <div class="form-group">
+    <input class="input" type="text" name="name" value="{{ location.name }}" required>
+  </div>
+  <div class="form-group">
+    <input class="input" type="text" name="tags" value="{{ location.tags or '' }}" placeholder="Tags (comma separated)">
+  </div>
+  <div class="form-group">
+    {% if location.image_path %}
+      <img src="{{ url_for('static', filename=location.image_path) }}" alt="{{ location.name }}" style="max-width:200px;display:block;margin-bottom:10px;" loading="lazy">
+    {% endif %}
+    <input class="input" type="file" name="image">
+  </div>
+  <div class="form-group">
+    <button class="btn" type="submit">Save</button>
+  </div>
+</form>
+{% endblock %}

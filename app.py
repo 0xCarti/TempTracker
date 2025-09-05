@@ -10,6 +10,7 @@ from flask import (Flask, render_template, request, redirect, url_for,
 from werkzeug.utils import secure_filename
 import qrcode
 import uuid
+from PIL import Image
 
 # Load environment variables from a .env file if present
 try:
@@ -37,13 +38,22 @@ def get_db():
     db = sqlite3.connect(app.config['DATABASE'])
     db.row_factory = sqlite3.Row
     db.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
-    # Lightweight migration: ensure 'note' column exists on 'log'
+    # Lightweight migrations
     try:
+        # ensure 'note' column exists on 'log'
         cols = db.execute("PRAGMA table_info(log)").fetchall()
         col_names = {c[1] for c in cols}
         if 'note' not in col_names:
             db.execute('ALTER TABLE log ADD COLUMN note TEXT')
-            db.commit()
+
+        # add image_path and tags to location if missing
+        cols = db.execute("PRAGMA table_info(location)").fetchall()
+        col_names = {c[1] for c in cols}
+        if 'image_path' not in col_names:
+            db.execute('ALTER TABLE location ADD COLUMN image_path TEXT')
+        if 'tags' not in col_names:
+            db.execute('ALTER TABLE location ADD COLUMN tags TEXT')
+        db.commit()
     except Exception:
         pass
     return db
@@ -82,12 +92,35 @@ def format_timestamp(ts, tzname):
     return dt.strftime('%H:%M %d/%m/%Y')
 
 
+def save_image(image_file):
+    """Resize and save uploaded image, returning relative path."""
+    unique_name = f"{uuid.uuid4().hex}.jpg"
+    path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+    image = Image.open(image_file)
+    image.thumbnail((800, 800))
+    if image.mode in ("RGBA", "P"):
+        image = image.convert("RGB")
+    image.save(path, format='JPEG', optimize=True, quality=85)
+    return os.path.join('uploads', unique_name)
+
+
 @app.route('/')
 def index():
+    tag = request.args.get('tag')
     db = get_db()
-    locations = db.execute('SELECT * FROM location').fetchall()
+    query = 'SELECT * FROM location'
+    params = []
+    if tag:
+        query += ' WHERE tags LIKE ?'
+        params.append(f'%{tag}%')
+    locations = db.execute(query, params).fetchall()
+    # collect all tags for filter options
+    rows = db.execute('SELECT tags FROM location WHERE tags IS NOT NULL AND tags != ""').fetchall()
     db.close()
-    return render_template('index.html', locations=locations)
+    tag_set = set()
+    for r in rows:
+        tag_set.update(t.strip() for t in r['tags'].split(',') if t.strip())
+    return render_template('index.html', locations=locations, tags=sorted(tag_set), current_tag=tag)
 
 
 @app.route('/location/<int:location_id>')
@@ -161,9 +194,13 @@ def submit_log(cooler_id, shift):
     db.execute('INSERT INTO log (cooler_id, shift, temperature, timestamp, signature, note) VALUES (?, ?, ?, ?, ?, ?)',
                (cooler_id, shift, temp_val, timestamp, signature, note))
     db.commit()
+    # fetch location to redirect to list
+    loc = db.execute('SELECT location_id FROM cooler WHERE id=?', (cooler_id,)).fetchone()
     db.close()
     flash('Temperature saved.', 'success')
-    return redirect(url_for('cooler_page', cooler_id=cooler_id))
+    if loc:
+        return redirect(url_for('location_page', location_id=loc['location_id']))
+    return redirect(url_for('index'))
 
 
 @app.route('/cooler/<int:cooler_id>/qr')
@@ -207,8 +244,14 @@ def admin_locations():
     db = get_db()
     if request.method == 'POST':
         name = request.form.get('name')
+        tags = request.form.get('tags')
+        image = request.files.get('image')
+        image_path = None
+        if image and image.filename:
+            image_path = save_image(image)
         if name:
-            db.execute('INSERT INTO location (name) VALUES (?)', (name,))
+            db.execute('INSERT INTO location (name, image_path, tags) VALUES (?, ?, ?)',
+                       (name, image_path, tags))
             db.commit()
     locations = db.execute('SELECT * FROM location').fetchall()
     db.close()
@@ -225,6 +268,31 @@ def delete_location(location_id):
     return redirect(url_for('admin_locations'))
 
 
+@app.route('/admin/locations/<int:location_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def edit_location(location_id):
+    db = get_db()
+    loc = db.execute('SELECT * FROM location WHERE id=?', (location_id,)).fetchone()
+    if not loc:
+        db.close()
+        return redirect(url_for('admin_locations'))
+    if request.method == 'POST':
+        name = request.form.get('name')
+        tags = request.form.get('tags')
+        image = request.files.get('image')
+        image_path = loc['image_path']
+        if image and image.filename:
+            image_path = save_image(image)
+        if name:
+            db.execute('UPDATE location SET name=?, image_path=?, tags=? WHERE id=?',
+                       (name, image_path, tags, location_id))
+            db.commit()
+            db.close()
+            return redirect(url_for('admin_locations'))
+    db.close()
+    return render_template('admin/edit_location.html', location=loc)
+
+
 @app.route('/admin/coolers', methods=['GET', 'POST'])
 @admin_required
 def admin_coolers():
@@ -236,17 +304,16 @@ def admin_coolers():
         image = request.files.get('image')
         image_path = None
         if image and image.filename:
-            filename = secure_filename(image.filename)
-            unique_name = f"{uuid.uuid4().hex}{os.path.splitext(filename)[1]}"
-            image.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
-            image_path = os.path.join('uploads', unique_name)
+            image_path = save_image(image)
         if name and location_id:
             db.execute('INSERT INTO cooler (location_id, name, image_path) VALUES (?, ?, ?)',
                        (location_id, name, image_path))
             db.commit()
+            session['last_location_id'] = location_id
     coolers = db.execute('SELECT cooler.*, location.name as location_name FROM cooler JOIN location ON cooler.location_id = location.id').fetchall()
+    selected = session.get('last_location_id')
     db.close()
-    return render_template('admin/coolers.html', coolers=coolers, locations=locations)
+    return render_template('admin/coolers.html', coolers=coolers, locations=locations, selected_location=selected)
 
 
 @app.route('/admin/coolers/<int:cooler_id>/delete')
@@ -257,6 +324,32 @@ def delete_cooler(cooler_id):
     db.commit()
     db.close()
     return redirect(url_for('admin_coolers'))
+
+
+@app.route('/admin/coolers/<int:cooler_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def edit_cooler(cooler_id):
+    db = get_db()
+    cooler = db.execute('SELECT * FROM cooler WHERE id=?', (cooler_id,)).fetchone()
+    locations = db.execute('SELECT * FROM location').fetchall()
+    if not cooler:
+        db.close()
+        return redirect(url_for('admin_coolers'))
+    if request.method == 'POST':
+        name = request.form.get('name')
+        location_id = request.form.get('location_id')
+        image = request.files.get('image')
+        image_path = cooler['image_path']
+        if image and image.filename:
+            image_path = save_image(image)
+        if name and location_id:
+            db.execute('UPDATE cooler SET name=?, location_id=?, image_path=? WHERE id=?',
+                       (name, location_id, image_path, cooler_id))
+            db.commit()
+            db.close()
+            return redirect(url_for('admin_coolers'))
+    db.close()
+    return render_template('admin/edit_cooler.html', cooler=cooler, locations=locations)
 
 
 @app.route('/admin/logs')

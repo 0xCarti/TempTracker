@@ -6,7 +6,7 @@
   <span></span>
 </div>
 {% if cooler.image_path %}
-<img src="{{ url_for('static', filename=cooler.image_path) }}" alt="{{ cooler.name }}" style="max-width:100%;height:auto;border-radius:8px;">
+<img src="{{ url_for('static', filename=cooler.image_path) }}" alt="{{ cooler.name }}" style="max-width:100%;height:auto;border-radius:8px;" loading="lazy">
 {% endif %}
 
 <p class="text-muted"><em>Choose a shift to record temperature.</em></p>

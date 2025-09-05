@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS location (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    image_path TEXT,
+    tags TEXT
 );
 
 CREATE TABLE IF NOT EXISTS cooler (

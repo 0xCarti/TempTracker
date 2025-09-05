@@ -3,7 +3,10 @@
 <h1>Coolers</h1>
 <ul>
   {% for c in coolers %}
-    <li>{{ c.name }} ({{ c.location_name }}) <a href="{{ url_for('delete_cooler', cooler_id=c.id) }}">Delete</a></li>
+    <li>{{ c.name }} ({{ c.location_name }})
+      <a href="{{ url_for('edit_cooler', cooler_id=c.id) }}">Edit</a>
+      <a href="{{ url_for('delete_cooler', cooler_id=c.id) }}">Delete</a>
+    </li>
   {% else %}
     <li>No coolers.</li>
   {% endfor %}
@@ -17,7 +20,7 @@
     <label>Location:
       <select class="input" name="location_id" required>
         {% for loc in locations %}
-          <option value="{{ loc.id }}">{{ loc.name }}</option>
+          <option value="{{ loc.id }}" {% if selected_location and selected_location|int == loc.id %}selected{% endif %}>{{ loc.name }}</option>
         {% endfor %}
       </select>
     </label>
