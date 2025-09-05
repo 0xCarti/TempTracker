@@ -2,3 +2,4 @@ Flask
 qrcode[pil]
 pytz
 python-dotenv
+Pillow

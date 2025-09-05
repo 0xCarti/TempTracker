@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Edit Cooler</h1>
+<form method="post" enctype="multipart/form-data">
+  <div class="form-group">
+    <input class="input" type="text" name="name" value="{{ cooler.name }}" required>
+  </div>
+  <div class="form-group">
+    <label>Location:
+      <select class="input" name="location_id" required>
+        {% for loc in locations %}
+          <option value="{{ loc.id }}" {% if cooler.location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <div class="form-group">
+    {% if cooler.image_path %}
+      <img src="{{ url_for('static', filename=cooler.image_path) }}" alt="{{ cooler.name }}" style="max-width:200px;display:block;margin-bottom:10px;" loading="lazy">
+    {% endif %}
+    <input class="input" type="file" name="image">
+  </div>
+  <div class="form-group">
+    <button class="btn" type="submit">Save</button>
+  </div>
+</form>
+{% endblock %}

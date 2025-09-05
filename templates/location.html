@@ -6,11 +6,15 @@
   <span></span>
 </div>
 
+{% if location.image_path %}
+<img src="{{ url_for('static', filename=location.image_path) }}" alt="{{ location.name }}" style="max-width:100%;height:auto;border-radius:8px;margin-bottom:10px;" loading="lazy">
+{% endif %}
+
 <div class="cooler-list">
   {% for c in coolers %}
     <a class="cooler-card" href="{{ url_for('cooler_page', cooler_id=c.id) }}">
       {% if c.image_path %}
-        <img class="cooler-img" src="{{ url_for('static', filename=c.image_path) }}" alt="{{ c.name }}">
+        <img class="cooler-img" src="{{ url_for('static', filename=c.image_path) }}" alt="{{ c.name }}" loading="lazy">
       {% else %}
         <div class="cooler-placeholder">{{ c.name }}</div>
       {% endif %}
